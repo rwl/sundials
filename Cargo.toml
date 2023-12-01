@@ -5,4 +5,4 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1"
-sundials-sys = { path = "../sundials-sys", features = [ "build_libraries" ] }
+sundials-sys = { path = "../sundials-sys", features = [ "build_libraries", "klu" ] }

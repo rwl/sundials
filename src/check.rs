@@ -12,7 +12,7 @@ pub(crate) fn check_non_null<T>(ptr: *mut T, func_id: &'static str) -> Result<()
 }
 
 pub(crate) fn check_is_success(retval: c_int, func_name: &'static str) -> Result<()> {
-    if retval != sundials_sys::CV_SUCCESS {
+    if retval != 0 {
         Err(format_err!(
             "SUNDIALS_ERROR: {}() failed with retval = {}",
             func_name,

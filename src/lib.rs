@@ -1,5 +1,7 @@
 pub(crate) mod check;
 
 pub mod context;
-pub mod kin;
-pub mod vector;
+pub mod kinsol;
+pub mod nvector;
+pub mod sunlinsol;
+pub mod sunmatrix;

@@ -13,7 +13,7 @@ pub struct NVector {
 impl NVector {
     pub fn new_serial(vec_length: impl Into<i64>, sunctx: &Context) -> Result<Self> {
         let l: i64 = vec_length.into();
-        let n_vector = unsafe { N_VNew_Serial(l, *sunctx.sunctx) };
+        let n_vector = unsafe { N_VNew_Serial(l, sunctx.sunctx) };
         check_non_null(n_vector, "N_VNew_Serial")?;
         Ok(Self {
             vec_length: l as usize,
