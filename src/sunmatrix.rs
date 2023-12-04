@@ -27,7 +27,7 @@ impl SparseMatrix {
         n: impl Into<sunindextype>,
         nnz: impl Into<sunindextype>,
         sparse_type: SparseType,
-        context: Context,
+        context: &Context,
     ) -> Self {
         Self {
             sunmatrix: unsafe {

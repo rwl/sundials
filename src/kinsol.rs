@@ -10,8 +10,8 @@ use std::pin::Pin;
 use std::slice::{from_raw_parts, from_raw_parts_mut};
 use sundials_sys::{
     realtype, KINCreate, KINFree, KINGetFuncNorm, KINInit, KINSetFuncNormTol, KINSetJacFn,
-    KINSetLinearSolver, KINSetUserData, KINSol, N_VGetArrayPointer_Serial, N_VGetLength, N_Vector,
-    SUNMatrix,
+    KINSetLinearSolver, KINSetPrintLevel, KINSetUserData, KINSol, N_VGetArrayPointer_Serial,
+    N_VGetLength, N_Vector, SUNMatrix,
 };
 
 pub enum Strategy {
@@ -109,7 +109,7 @@ pub struct KIN<U> {
 }
 
 impl<U> KIN<U> {
-    pub fn new(context: Context) -> Result<Self> {
+    pub fn new(context: &Context) -> Result<Self> {
         let kinmem = unsafe { KINCreate(context.sunctx) };
         check_non_null(kinmem, "KINCreate")?;
         Ok(KIN {
@@ -192,6 +192,11 @@ impl<U> KIN<U> {
         check_is_success(retval, "KINSetFuncNormTol")
     }
 
+    pub fn set_print_level(&mut self, printfl: usize) -> Result<()> {
+        let retval = unsafe { KINSetPrintLevel(self.kinmem, printfl as c_int) };
+        check_is_success(retval, "KINSetPrintLevel")
+    }
+
     pub fn set_linear_solver(&mut self, ls: &LinearSolver, a: &SparseMatrix) -> Result<()> {
         let retval = unsafe { KINSetLinearSolver(self.kinmem, ls.sunlinsol, a.sunmatrix) };
         check_is_success(retval, "KINSetLinearSolver")
@@ -199,7 +204,7 @@ impl<U> KIN<U> {
 
     pub fn solve(
         &self,
-        uu: &NVector,
+        uu: &mut NVector,
         strategy: Strategy,
         u_scale: &NVector,
         f_scale: &NVector,
