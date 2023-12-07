@@ -2,7 +2,8 @@ use crate::check::check_non_null;
 use crate::context::Context;
 use anyhow::Result;
 use sundials_sys::{
-    realtype, N_VClone, N_VConst, N_VDestroy, N_VGetArrayPointer_Serial, N_VNew_Serial, N_Vector,
+    realtype, N_VClone, N_VConst, N_VDestroy, N_VGetArrayPointer_Serial, N_VGetLength,
+    N_VNew_Serial, N_Vector,
 };
 
 pub struct NVector {
@@ -21,14 +22,21 @@ impl NVector {
         })
     }
 
-    pub fn as_slice(&self) -> &[sundials_sys::realtype] {
+    pub fn from_raw(n_vector: N_Vector) -> Self {
+        Self {
+            n_vector,
+            vec_length: unsafe { N_VGetLength(n_vector) } as usize,
+        }
+    }
+
+    pub fn as_slice(&self) -> &[realtype] {
         unsafe {
             let pointer = N_VGetArrayPointer_Serial(self.n_vector);
             std::slice::from_raw_parts(pointer, self.vec_length)
         }
     }
 
-    pub fn as_slice_mut(&self) -> &[realtype] {
+    pub fn as_slice_mut(&self) -> &mut [realtype] {
         unsafe {
             let pointer = N_VGetArrayPointer_Serial(self.n_vector);
             std::slice::from_raw_parts_mut(pointer, self.vec_length)

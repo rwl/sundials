@@ -103,6 +103,7 @@ unsafe extern "C" fn jac_fn_wrapper<U>(
     (wrapper.jac_fn)(u, fu, &j_mat, &wrapper.actual_user_data, tmp1, tmp2)
 }
 
+/// Solves nonlinear algebraic systems.
 pub struct KIN<U> {
     kinmem: *mut c_void,
     wrapped_user_data: Pin<Box<UserDataWrapper<U>>>,

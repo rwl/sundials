@@ -4,7 +4,7 @@ use crate::nvector::NVector;
 
 use anyhow::Result;
 use std::os::raw::c_int;
-use std::slice::from_raw_parts_mut;
+use std::slice::{from_raw_parts, from_raw_parts_mut};
 use sundials_sys::{
     realtype, sunindextype, SUNMatDestroy_Sparse, SUNMatMatvec_Sparse, SUNMatrix, SUNSparseMatrix,
     SUNSparseMatrix_Columns, SUNSparseMatrix_Data, SUNSparseMatrix_IndexPointers,
@@ -68,7 +68,33 @@ impl SparseMatrix {
         }
     }
 
-    pub fn index_pointers(&mut self) -> &mut [sunindextype] {
+    pub fn index_pointers(&self) -> &[sunindextype] {
+        let indptr = unsafe { SUNSparseMatrix_IndexPointers(self.sunmatrix) };
+        match self.sparse_type() {
+            SparseType::CSC => {
+                let columns = self.columns();
+                unsafe { from_raw_parts(indptr, columns + 1) }
+            }
+            SparseType::CSR => {
+                let rows = self.rows();
+                unsafe { from_raw_parts(indptr, rows + 1) }
+            }
+        }
+    }
+
+    pub fn index_values(&self) -> &[sunindextype] {
+        let indval = unsafe { SUNSparseMatrix_IndexValues(self.sunmatrix) };
+        let nnz = self.nnz();
+        unsafe { from_raw_parts(indval, nnz) }
+    }
+
+    pub fn data(&self) -> &[realtype] {
+        let indval = unsafe { SUNSparseMatrix_Data(self.sunmatrix) };
+        let nnz = self.nnz();
+        unsafe { from_raw_parts(indval, nnz) }
+    }
+
+    pub fn index_pointers_mut(&mut self) -> &mut [sunindextype] {
         let indptr = unsafe { SUNSparseMatrix_IndexPointers(self.sunmatrix) };
         match self.sparse_type() {
             SparseType::CSC => {
@@ -82,13 +108,13 @@ impl SparseMatrix {
         }
     }
 
-    pub fn index_values(&mut self) -> &mut [sunindextype] {
+    pub fn index_values_mut(&mut self) -> &mut [sunindextype] {
         let indval = unsafe { SUNSparseMatrix_IndexValues(self.sunmatrix) };
         let nnz = self.nnz();
         unsafe { from_raw_parts_mut(indval, nnz) }
     }
 
-    pub fn data(&mut self) -> &mut [realtype] {
+    pub fn data_mut(&mut self) -> &mut [realtype] {
         let indval = unsafe { SUNSparseMatrix_Data(self.sunmatrix) };
         let nnz = self.nnz();
         unsafe { from_raw_parts_mut(indval, nnz) }

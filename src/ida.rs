@@ -61,6 +61,7 @@ extern "C" fn res_fn_wrapper<U>(
     (wrapper.res_fn)(tt, yy, yp, rr, &wrapper.actual_user_data)
 }
 
+/// Solves initial value problems for differential-algebraic equation (DAE) systems.
 pub struct IDA<U> {
     ida_mem: *mut c_void,
     wrapped_user_data: Pin<Box<UserDataWrapper<U>>>,
