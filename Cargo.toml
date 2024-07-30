@@ -10,8 +10,6 @@ anyhow = "1"
 sundials-sys = { version = "0.5.1", features = ["build_libraries"] }
 faer = { version = "0.19", optional = true }
 
-[dev-dependencies]
-sundials-sys = { version = "0.5.1", features = ["build_libraries", "klu"] }
-
 [features]
 default = ["faer"]
+klu = ["sundials-sys/klu"]
