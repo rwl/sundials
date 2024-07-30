@@ -3,6 +3,7 @@ name = "sundials"
 version = "0.1.0"
 license = "BSD-3-Clause"
 edition = "2021"
+repository = "https://github.com/rwl/sundials"
 
 [dependencies]
 anyhow = "1"
