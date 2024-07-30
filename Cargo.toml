@@ -6,8 +6,11 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1"
-sundials-sys = { path = "../sundials-sys", features = [ "build_libraries", "klu" ] }
-spsolve = { version = "0.1", optional = true }
+sundials-sys = { version = "0.5.1", features = ["build_libraries"] }
+faer = { version = "0.19", optional = true }
+
+[dev-dependencies]
+sundials-sys = { version = "0.5.1", features = ["build_libraries", "klu"] }
 
 [features]
-default = [ "spsolve" ]
+default = ["faer"]

@@ -9,8 +9,8 @@ use std::os::raw::{c_int, c_void};
 use std::pin::Pin;
 use std::slice::{from_raw_parts, from_raw_parts_mut};
 use sundials_sys::{
-    realtype, KINCreate, KINFree, KINGetFuncNorm, KINInit, KINSetFuncNormTol, KINSetJacFn,
-    KINSetLinearSolver, KINSetPrintLevel, KINSetUserData, KINSol, N_VGetArrayPointer_Serial,
+    sunrealtype, KINCreate, KINFree, KINGetFuncNorm, KINInit, KINSetFuncNormTol, KINSetJacFn,
+    KINSetLinearSolver, KINSetUserData, KINSol, N_VGetArrayPointer_Serial,
     N_VGetLength, N_Vector, SUNMatrix,
 };
 
@@ -21,14 +21,14 @@ pub enum Strategy {
     FP = 3,
 }
 
-pub type SysFn<U> = fn(uu: &[realtype], fval: &mut [realtype], user_data: &Option<U>) -> i32;
+pub type SysFn<U> = fn(uu: &[sunrealtype], fval: &mut [sunrealtype], user_data: &Option<U>) -> i32;
 pub type JacFn<U> = fn(
-    u: &[realtype],
-    fu: &mut [realtype],
+    u: &[sunrealtype],
+    fu: &mut [sunrealtype],
     j_mat: &SparseMatrix,
     user_data: &Option<U>,
-    tmp1: &[realtype],
-    tmp2: &[realtype],
+    tmp1: &[sunrealtype],
+    tmp2: &[sunrealtype],
 ) -> i32;
 
 struct UserDataWrapper<U> {
@@ -37,17 +37,17 @@ struct UserDataWrapper<U> {
     jac_fn: JacFn<U>,
 }
 
-fn empty_sys_fn<U>(_uu: &[realtype], _fval: &mut [realtype], _user_data: &Option<U>) -> i32 {
+fn empty_sys_fn<U>(_uu: &[sunrealtype], _fval: &mut [sunrealtype], _user_data: &Option<U>) -> i32 {
     sundials_sys::KIN_SUCCESS
 }
 
 fn empty_jac_fn<U>(
-    _u: &[realtype],
-    _fu: &mut [realtype],
+    _u: &[sunrealtype],
+    _fu: &mut [sunrealtype],
     _j_mat: &SparseMatrix,
     _user_data: &Option<U>,
-    _tmp1: &[realtype],
-    _tmp2: &[realtype],
+    _tmp1: &[sunrealtype],
+    _tmp2: &[sunrealtype],
 ) -> i32 {
     sundials_sys::KIN_SUCCESS
 }
@@ -188,14 +188,9 @@ impl<U> KIN<U> {
     //     Ok(())
     // }
 
-    pub fn set_func_norm_tol(&mut self, fnormtol: impl Into<realtype>) -> Result<()> {
+    pub fn set_func_norm_tol(&mut self, fnormtol: impl Into<sunrealtype>) -> Result<()> {
         let retval = unsafe { KINSetFuncNormTol(self.kinmem, fnormtol.into()) };
         check_is_success(retval, "KINSetFuncNormTol")
-    }
-
-    pub fn set_print_level(&mut self, printfl: usize) -> Result<()> {
-        let retval = unsafe { KINSetPrintLevel(self.kinmem, printfl as c_int) };
-        check_is_success(retval, "KINSetPrintLevel")
     }
 
     pub fn set_linear_solver(&mut self, ls: &LinearSolver, a: &SparseMatrix) -> Result<()> {
@@ -222,8 +217,8 @@ impl<U> KIN<U> {
         check_is_success(retval, "KINSol")
     }
 
-    pub fn func_form(&self) -> Result<realtype> {
-        let mut fnorm: realtype = realtype::default();
+    pub fn func_form(&self) -> Result<sunrealtype> {
+        let mut fnorm: sunrealtype = sunrealtype::default();
         let retval = unsafe { KINGetFuncNorm(self.kinmem, &mut fnorm) };
         check_is_success(retval, "KINGetFuncNorm")?;
         Ok(fnorm)

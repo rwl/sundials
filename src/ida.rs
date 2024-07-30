@@ -10,7 +10,7 @@ use std::os::raw::{c_long, c_void};
 use std::pin::Pin;
 use std::slice::{from_raw_parts, from_raw_parts_mut};
 use sundials_sys::{
-    realtype, IDACreate, IDAEwtFn, IDAFree, IDAGetNumSteps, IDAInit, IDASStolerances,
+    sunrealtype, IDACreate, IDAEwtFn, IDAFree, IDAGetNumSteps, IDAInit, IDASStolerances,
     IDASVtolerances, IDASetInitStep, IDASetLinearSolver, IDASetMaxConvFails, IDASetMaxNonlinIters,
     IDASetMaxNumSteps, IDASetMaxOrd, IDASetNonlinConvCoef, IDASetNonlinearSolver, IDASetStopTime,
     IDASetUserData, IDAWFtolerances, N_VGetArrayPointer_Serial, N_VGetLength, N_Vector,
@@ -18,7 +18,7 @@ use sundials_sys::{
 };
 
 pub type ResFn<U> =
-    fn(tt: f64, yy: &[realtype], yp: &[realtype], rr: &[realtype], user_data: &Option<U>) -> i32;
+fn(tt: f64, yy: &[sunrealtype], yp: &[sunrealtype], rr: &[sunrealtype], user_data: &Option<U>) -> i32;
 
 struct UserDataWrapper<U> {
     actual_user_data: Option<U>,
@@ -27,16 +27,16 @@ struct UserDataWrapper<U> {
 
 fn empty_res_fn<U>(
     _tt: f64,
-    _yy: &[realtype],
-    _yp: &[realtype],
-    _rr: &[realtype],
+    _yy: &[sunrealtype],
+    _yp: &[sunrealtype],
+    _rr: &[sunrealtype],
     _user_data: &Option<U>,
 ) -> i32 {
     sundials_sys::KIN_SUCCESS
 }
 
 extern "C" fn res_fn_wrapper<U>(
-    tt: realtype,
+    tt: sunrealtype,
     yy: N_Vector,
     yp: N_Vector,
     rr: N_Vector,
@@ -132,13 +132,13 @@ impl<U> IDA<U> {
     }
 
     /// Specify the initial step size.
-    pub fn set_init_step(&mut self, hin: impl Into<realtype>) -> Result<()> {
+    pub fn set_init_step(&mut self, hin: impl Into<sunrealtype>) -> Result<()> {
         let retval = unsafe { IDASetInitStep(self.ida_mem, hin.into()) };
         check_is_success(retval, "IDASetInitStep")
     }
 
     /// Specify the value of the independent variable `t` past which the solution is not to proceed.
-    pub fn set_stop_time(&mut self, tstop: impl Into<realtype>) -> Result<()> {
+    pub fn set_stop_time(&mut self, tstop: impl Into<sunrealtype>) -> Result<()> {
         let retval = unsafe { IDASetStopTime(self.ida_mem, tstop.into()) };
         check_is_success(retval, "IDASetStopTime")
     }
@@ -146,15 +146,15 @@ impl<U> IDA<U> {
     /// Specify scalar relative and absolute tolerances.
     pub fn ss_tolerances(
         &mut self,
-        reltol: impl Into<realtype>,
-        abstol: impl Into<realtype>,
+        reltol: impl Into<sunrealtype>,
+        abstol: impl Into<sunrealtype>,
     ) -> Result<()> {
         let retval = unsafe { IDASStolerances(self.ida_mem, reltol.into(), abstol.into()) };
         check_is_success(retval, "IDASStolerances")
     }
 
     /// Specify scalar relative tolerance and vector absolute tolerances.
-    pub fn sv_tolerances(&mut self, reltol: impl Into<realtype>, abstol: &NVector) -> Result<()> {
+    pub fn sv_tolerances(&mut self, reltol: impl Into<sunrealtype>, abstol: &NVector) -> Result<()> {
         let retval = unsafe { IDASVtolerances(self.ida_mem, reltol.into(), abstol.n_vector) };
         check_is_success(retval, "IDASVtolerances")
     }
@@ -202,7 +202,7 @@ impl<U> IDA<U> {
     }
 
     /// Specifies the safety factor in the nonlinear convergence test.
-    pub fn set_nonlin_conv_coef(&mut self, epcon: impl Into<realtype>) -> Result<()> {
+    pub fn set_nonlin_conv_coef(&mut self, epcon: impl Into<sunrealtype>) -> Result<()> {
         let retval = unsafe { IDASetNonlinConvCoef(self.ida_mem, epcon.into()) };
         check_is_success(retval, "IDASetNonlinConvCoef")
     }

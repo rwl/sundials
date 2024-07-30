@@ -7,5 +7,5 @@ pub mod nvector;
 pub mod sunlinsol;
 pub mod sunmatrix;
 
-#[cfg(feature = "spsolve")]
-pub mod sunlinsol_spsolve;
+#[cfg(feature = "faer")]
+pub mod sunlinsol_faer;

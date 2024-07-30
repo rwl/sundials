@@ -6,9 +6,9 @@ use anyhow::Result;
 use std::os::raw::c_int;
 use std::slice::{from_raw_parts, from_raw_parts_mut};
 use sundials_sys::{
-    realtype, sunindextype, SUNMatDestroy_Sparse, SUNMatMatvec_Sparse, SUNMatrix, SUNSparseMatrix,
-    SUNSparseMatrix_Columns, SUNSparseMatrix_Data, SUNSparseMatrix_IndexPointers,
-    SUNSparseMatrix_IndexValues, SUNSparseMatrix_NNZ, SUNSparseMatrix_Rows,
+    stdout, sunindextype, sunrealtype, SUNMatDestroy_Sparse, SUNMatMatvec_Sparse, SUNMatrix,
+    SUNSparseMatrix, SUNSparseMatrix_Columns, SUNSparseMatrix_Data, SUNSparseMatrix_IndexPointers,
+    SUNSparseMatrix_IndexValues, SUNSparseMatrix_NNZ, SUNSparseMatrix_Print, SUNSparseMatrix_Rows,
     SUNSparseMatrix_SparseType,
 };
 
@@ -19,6 +19,7 @@ pub enum SparseType {
 
 pub struct SparseMatrix {
     pub(crate) sunmatrix: SUNMatrix,
+    raw: bool,
 }
 
 impl SparseMatrix {
@@ -39,11 +40,15 @@ impl SparseMatrix {
                     context.sunctx,
                 )
             },
+            raw: false,
         }
     }
 
     pub fn from_raw(sunmatrix: SUNMatrix) -> Self {
-        Self { sunmatrix }
+        Self {
+            sunmatrix,
+            raw: true,
+        }
     }
 
     pub fn rows(&self) -> usize {
@@ -88,7 +93,7 @@ impl SparseMatrix {
         unsafe { from_raw_parts(indval, nnz) }
     }
 
-    pub fn data(&self) -> &[realtype] {
+    pub fn data(&self) -> &[sunrealtype] {
         let indval = unsafe { SUNSparseMatrix_Data(self.sunmatrix) };
         let nnz = self.nnz();
         unsafe { from_raw_parts(indval, nnz) }
@@ -114,7 +119,7 @@ impl SparseMatrix {
         unsafe { from_raw_parts_mut(indval, nnz) }
     }
 
-    pub fn data_mut(&mut self) -> &mut [realtype] {
+    pub fn data_mut(&mut self) -> &mut [sunrealtype] {
         let indval = unsafe { SUNSparseMatrix_Data(self.sunmatrix) };
         let nnz = self.nnz();
         unsafe { from_raw_parts_mut(indval, nnz) }
@@ -124,10 +129,16 @@ impl SparseMatrix {
         let retval = unsafe { SUNMatMatvec_Sparse(self.sunmatrix, x.n_vector, y.n_vector) };
         check_is_success(retval, "SUNMatMatvec_Sparse")
     }
+
+    pub fn print(&self) {
+        unsafe { SUNSparseMatrix_Print(self.sunmatrix, stdout) }
+    }
 }
 
 impl Drop for SparseMatrix {
     fn drop(&mut self) {
-        unsafe { SUNMatDestroy_Sparse(self.sunmatrix) }
+        if !self.raw {
+            unsafe { SUNMatDestroy_Sparse(self.sunmatrix) }
+        }
     }
 }
