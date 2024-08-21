@@ -8,8 +8,8 @@ use std::slice::{from_raw_parts, from_raw_parts_mut};
 use sundials_sys::{
     stdout, sunindextype, sunrealtype, SUNMatDestroy_Sparse, SUNMatMatvec_Sparse, SUNMatrix,
     SUNSparseMatrix, SUNSparseMatrix_Columns, SUNSparseMatrix_Data, SUNSparseMatrix_IndexPointers,
-    SUNSparseMatrix_IndexValues, SUNSparseMatrix_NNZ, SUNSparseMatrix_Print, SUNSparseMatrix_Rows,
-    SUNSparseMatrix_SparseType,
+    SUNSparseMatrix_IndexValues, SUNSparseMatrix_NNZ, SUNSparseMatrix_Print,
+    SUNSparseMatrix_Reallocate, SUNSparseMatrix_Rows, SUNSparseMatrix_SparseType,
 };
 
 pub enum SparseType {
@@ -123,6 +123,11 @@ impl SparseMatrix {
         let indval = unsafe { SUNSparseMatrix_Data(self.sunmatrix) };
         let nnz = self.nnz();
         unsafe { from_raw_parts_mut(indval, nnz) }
+    }
+
+    pub fn reallocate(&self, nnz: sunindextype) -> Result<()> {
+        let retval = unsafe { SUNSparseMatrix_Reallocate(self.sunmatrix, nnz) };
+        check_is_success(retval, "SUNSparseMatrix_Reallocate")
     }
 
     pub fn mat_vec(&self, x: &NVector, y: &mut NVector) -> Result<()> {
