@@ -1,10 +1,13 @@
+use anyhow::Result;
+use std::ops::{AddAssign, MulAssign};
+use sundials_sys::{
+    sunrealtype, N_VAbs, N_VAddConst, N_VClone, N_VConst, N_VDestroy, N_VGetArrayPointer_Serial,
+    N_VGetLength, N_VInv, N_VLinearSum, N_VMin, N_VNew_Serial, N_VPrint, N_VScale, N_VWrmsNorm,
+    N_Vector,
+};
+
 use crate::check::check_non_null;
 use crate::context::Context;
-use anyhow::Result;
-use sundials_sys::{
-    sunrealtype, N_VClone, N_VConst, N_VDestroy, N_VGetArrayPointer_Serial, N_VGetLength,
-    N_VNew_Serial, N_VPrint, N_Vector,
-};
 
 pub struct NVector {
     vec_length: usize,
@@ -57,6 +60,43 @@ impl NVector {
     pub fn len(&self) -> usize {
         self.vec_length
     }
+
+    pub fn abs(&self, z: &mut NVector) {
+        unsafe { N_VAbs(self.n_vector, z.n_vector) }
+    }
+
+    pub fn scale(&self, c: sunrealtype, z: &mut NVector) {
+        // pub fn scale(&mut self, c: sunrealtype) {
+        unsafe { N_VScale(c, self.n_vector, z.n_vector) }
+        // unsafe { N_VScale(c, self.n_vector, self.n_vector) }
+    }
+
+    pub fn add_const(&self, b: sunrealtype, z: &mut NVector) {
+        // pub fn add_const(&mut self, b: sunrealtype) {
+        unsafe { N_VAddConst(self.n_vector, b, z.n_vector) }
+        // unsafe { N_VAddConst(self.n_vector, b, self.n_vector) }
+    }
+
+    pub fn min(&self) -> sunrealtype {
+        unsafe { N_VMin(self.n_vector) }
+    }
+
+    // pub fn inv(&self, z: &mut NVector) {
+    pub fn inv(&mut self) {
+        // unsafe { N_VInv(self.n_vector, z.n_vector) }
+        unsafe { N_VInv(self.n_vector, self.n_vector) }
+    }
+
+    /// Linear combination of two vectors: `z = a*x + b*y`.
+    pub fn linear_sum(a: sunrealtype, x: &NVector, b: sunrealtype, y: &NVector) -> NVector {
+        let z = x.clone();
+        unsafe { N_VLinearSum(a, x.n_vector, b, y.n_vector, z.n_vector) }
+        z
+    }
+
+    pub fn wrms_norm(&self, w: &NVector) -> sunrealtype {
+        unsafe { N_VWrmsNorm(self.n_vector, w.n_vector) }
+    }
 }
 
 impl Drop for NVector {
@@ -77,5 +117,17 @@ impl Clone for NVector {
             n_vector,
             raw: self.raw,
         }
+    }
+}
+
+impl AddAssign<sunrealtype> for NVector {
+    fn add_assign(&mut self, rhs: sunrealtype) {
+        unsafe { N_VAddConst(self.n_vector, rhs, self.n_vector) }
+    }
+}
+
+impl MulAssign<sunrealtype> for NVector {
+    fn mul_assign(&mut self, rhs: sunrealtype) {
+        unsafe { N_VScale(rhs, self.n_vector, self.n_vector) }
     }
 }

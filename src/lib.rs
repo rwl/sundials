@@ -9,3 +9,6 @@ pub mod sunmatrix;
 
 #[cfg(feature = "faer")]
 pub mod sunlinsol_faer;
+
+pub use sundials_sys::sunindextype;
+pub use sundials_sys::sunrealtype;

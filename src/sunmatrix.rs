@@ -125,8 +125,8 @@ impl SparseMatrix {
         unsafe { from_raw_parts_mut(indval, nnz) }
     }
 
-    pub fn reallocate(&self, nnz: sunindextype) -> Result<()> {
-        let retval = unsafe { SUNSparseMatrix_Reallocate(self.sunmatrix, nnz) };
+    pub fn reallocate(&self, nnz: usize) -> Result<()> {
+        let retval = unsafe { SUNSparseMatrix_Reallocate(self.sunmatrix, nnz as sunindextype) };
         check_is_success(retval, "SUNSparseMatrix_Reallocate")
     }
 

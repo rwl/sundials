@@ -17,8 +17,13 @@ use sundials_sys::{
     SUNNonlinearSolver,
 };
 
-pub type ResFn<U> =
-fn(tt: f64, yy: &[sunrealtype], yp: &[sunrealtype], rr: &[sunrealtype], user_data: &Option<U>) -> i32;
+pub type ResFn<U> = fn(
+    tt: f64,
+    yy: &[sunrealtype],
+    yp: &[sunrealtype],
+    rr: &[sunrealtype],
+    user_data: &Option<U>,
+) -> i32;
 
 struct UserDataWrapper<U> {
     actual_user_data: Option<U>,
@@ -154,7 +159,11 @@ impl<U> IDA<U> {
     }
 
     /// Specify scalar relative tolerance and vector absolute tolerances.
-    pub fn sv_tolerances(&mut self, reltol: impl Into<sunrealtype>, abstol: &NVector) -> Result<()> {
+    pub fn sv_tolerances(
+        &mut self,
+        reltol: impl Into<sunrealtype>,
+        abstol: &NVector,
+    ) -> Result<()> {
         let retval = unsafe { IDASVtolerances(self.ida_mem, reltol.into(), abstol.n_vector) };
         check_is_success(retval, "IDASVtolerances")
     }
@@ -167,7 +176,7 @@ impl<U> IDA<U> {
     }
 
     /// Attaches a [LinearSolver] object `ls` and corresponding template Jacobian
-    /// [Matrix] object `J` (if applicable) to IDA, initializing the IDALS linear
+    /// [SparseMatrix] object `J` (if applicable) to IDA, initializing the IDALS linear
     /// solver interface.
     pub fn set_linear_solver(
         &mut self,
