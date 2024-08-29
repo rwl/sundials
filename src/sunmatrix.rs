@@ -6,10 +6,11 @@ use anyhow::Result;
 use std::os::raw::c_int;
 use std::slice::{from_raw_parts, from_raw_parts_mut};
 use sundials_sys::{
-    stdout, sunindextype, sunrealtype, SUNMatDestroy_Sparse, SUNMatMatvec_Sparse, SUNMatrix,
-    SUNSparseMatrix, SUNSparseMatrix_Columns, SUNSparseMatrix_Data, SUNSparseMatrix_IndexPointers,
-    SUNSparseMatrix_IndexValues, SUNSparseMatrix_NNZ, SUNSparseMatrix_Print,
-    SUNSparseMatrix_Reallocate, SUNSparseMatrix_Rows, SUNSparseMatrix_SparseType,
+    stdout, sunindextype, sunrealtype, SUNMatDestroy_Sparse, SUNMatMatvec_Sparse, SUNMatZero,
+    SUNMatrix, SUNSparseMatrix, SUNSparseMatrix_Columns, SUNSparseMatrix_Data,
+    SUNSparseMatrix_IndexPointers, SUNSparseMatrix_IndexValues, SUNSparseMatrix_NNZ,
+    SUNSparseMatrix_Print, SUNSparseMatrix_Reallocate, SUNSparseMatrix_Rows,
+    SUNSparseMatrix_SparseType,
 };
 
 pub enum SparseType {
@@ -120,9 +121,35 @@ impl SparseMatrix {
     }
 
     pub fn data_mut(&mut self) -> &mut [sunrealtype] {
-        let indval = unsafe { SUNSparseMatrix_Data(self.sunmatrix) };
+        let data = unsafe { SUNSparseMatrix_Data(self.sunmatrix) };
         let nnz = self.nnz();
-        unsafe { from_raw_parts_mut(indval, nnz) }
+        unsafe { from_raw_parts_mut(data, nnz) }
+    }
+
+    pub fn index_pointers_values_data_mut(
+        &mut self,
+    ) -> (&mut [sunindextype], &mut [sunindextype], &mut [sunrealtype]) {
+        let indptr = unsafe { SUNSparseMatrix_IndexPointers(self.sunmatrix) };
+        let indptr = match self.sparse_type() {
+            SparseType::CSC => {
+                let columns = self.columns();
+                unsafe { from_raw_parts_mut(indptr, columns + 1) }
+            }
+            SparseType::CSR => {
+                let rows = self.rows();
+                unsafe { from_raw_parts_mut(indptr, rows + 1) }
+            }
+        };
+
+        let indval = unsafe { SUNSparseMatrix_IndexValues(self.sunmatrix) };
+        let nnz = self.nnz();
+        let indval = unsafe { from_raw_parts_mut(indval, nnz) };
+
+        let data = unsafe { SUNSparseMatrix_Data(self.sunmatrix) };
+        let nnz = self.nnz();
+        let data = unsafe { from_raw_parts_mut(data, nnz) };
+
+        (indptr, indval, data)
     }
 
     pub fn reallocate(&self, nnz: usize) -> Result<()> {
@@ -133,6 +160,11 @@ impl SparseMatrix {
     pub fn mat_vec(&self, x: &NVector, y: &mut NVector) -> Result<()> {
         let retval = unsafe { SUNMatMatvec_Sparse(self.sunmatrix, x.n_vector, y.n_vector) };
         check_is_success(retval, "SUNMatMatvec_Sparse")
+    }
+
+    pub fn zero(&mut self) -> Result<()> {
+        let retval = unsafe { SUNMatZero(self.sunmatrix) };
+        check_is_success(retval, "SUNMatZero")
     }
 
     pub fn print(&self) {

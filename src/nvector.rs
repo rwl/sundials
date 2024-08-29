@@ -1,5 +1,5 @@
 use anyhow::Result;
-use std::ops::{AddAssign, MulAssign};
+use std::ops::{AddAssign, Mul, MulAssign};
 use sundials_sys::{
     sunrealtype, N_VAbs, N_VAddConst, N_VClone, N_VConst, N_VDestroy, N_VGetArrayPointer_Serial,
     N_VGetLength, N_VInv, N_VLinearSum, N_VMin, N_VNew_Serial, N_VPrint, N_VScale, N_VWrmsNorm,
@@ -130,4 +130,18 @@ impl MulAssign<sunrealtype> for NVector {
     fn mul_assign(&mut self, rhs: sunrealtype) {
         unsafe { N_VScale(rhs, self.n_vector, self.n_vector) }
     }
+}
+
+impl Mul<sunrealtype> for NVector {
+    type Output = Self;
+
+    fn mul(self, rhs: sunrealtype) -> Self::Output {
+        let out = self.clone();
+        unsafe { N_VScale(rhs, self.n_vector, self.n_vector) }
+        out
+    }
+}
+
+pub fn scale(c: sunrealtype, x: &NVector, z: &mut NVector) {
+    unsafe { N_VScale(c, x.n_vector, z.n_vector) }
 }

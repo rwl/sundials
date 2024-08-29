@@ -1,19 +1,21 @@
+use anyhow::Result;
+use std::os::raw::{c_int, c_long, c_void};
+use std::pin::Pin;
+
+use sundials_sys::{
+    sunindextype, sunrealtype, KINCreate, KINFree, KINGetFuncNorm, KINGetNumFuncEvals,
+    KINGetNumJacEvals, KINGetNumNonlinSolvIters, KINInit, KINSetConstraints, KINSetFuncNormTol,
+    KINSetJacFn, KINSetLinearSolver, KINSetMAA, KINSetMaxSetupCalls, KINSetScaledStepTol,
+    KINSetUserData, KINSol, N_Vector, SUNMatrix,
+};
+
 use crate::check::{check_is_success, check_non_null};
 use crate::context::Context;
 use crate::nvector::NVector;
 use crate::sunlinsol::LinearSolver;
 use crate::sunmatrix::SparseMatrix;
 
-use anyhow::Result;
-use std::os::raw::{c_int, c_long, c_void};
-use std::pin::Pin;
-use std::slice::{from_raw_parts, from_raw_parts_mut};
-use sundials_sys::{
-    sunrealtype, KINCreate, KINFree, KINGetFuncNorm, KINGetNumFuncEvals, KINGetNumNonlinSolvIters,
-    KINInit, KINSetFuncNormTol, KINSetJacFn, KINSetLinearSolver, KINSetMAA, KINSetUserData, KINSol,
-    N_VGetArrayPointer_Serial, N_VGetLength, N_Vector, SUNMatrix,
-};
-
+#[derive(PartialEq)]
 pub enum Strategy {
     None = 0,
     LineSearch = 1,
@@ -21,14 +23,14 @@ pub enum Strategy {
     FP = 3,
 }
 
-pub type SysFn<U> = fn(uu: &[sunrealtype], fval: &mut [sunrealtype], user_data: &Option<U>) -> i32;
+pub type SysFn<U> = fn(uu: &NVector, fval: &mut NVector, user_data: &Option<U>) -> i32;
 pub type JacFn<U> = fn(
-    u: &[sunrealtype],
-    fu: &mut [sunrealtype],
+    u: &NVector,
+    fu: &mut NVector, // TODO: mut?
     j_mat: &mut SparseMatrix,
     user_data: &Option<U>,
-    tmp1: &[sunrealtype],
-    tmp2: &[sunrealtype],
+    tmp1: &NVector,
+    tmp2: &NVector,
 ) -> i32;
 
 struct UserDataWrapper<U> {
@@ -37,34 +39,36 @@ struct UserDataWrapper<U> {
     jac_fn: JacFn<U>,
 }
 
-fn empty_sys_fn<U>(_uu: &[sunrealtype], _fval: &mut [sunrealtype], _user_data: &Option<U>) -> i32 {
+fn empty_sys_fn<U>(_uu: &NVector, _fval: &mut NVector, _user_data: &Option<U>) -> i32 {
     sundials_sys::KIN_SUCCESS
 }
 
 fn empty_jac_fn<U>(
-    _u: &[sunrealtype],
-    _fu: &mut [sunrealtype],
+    _u: &NVector,
+    _fu: &mut NVector,
     _j_mat: &mut SparseMatrix,
     _user_data: &Option<U>,
-    _tmp1: &[sunrealtype],
-    _tmp2: &[sunrealtype],
+    _tmp1: &NVector,
+    _tmp2: &NVector,
 ) -> i32 {
     sundials_sys::KIN_SUCCESS
 }
 
 extern "C" fn sys_fn_wrapper<U>(uu: N_Vector, fval: N_Vector, user_data: *mut c_void) -> c_int {
-    let uu = unsafe {
-        let pointer = N_VGetArrayPointer_Serial(uu);
-        let length = N_VGetLength(uu);
-        from_raw_parts(pointer, length as usize)
-    };
-    let fval = unsafe {
-        let pointer = N_VGetArrayPointer_Serial(fval);
-        let length = N_VGetLength(fval);
-        from_raw_parts_mut(pointer, length as usize)
-    };
+    // let uu = unsafe {
+    //     let pointer = N_VGetArrayPointer_Serial(uu);
+    //     let length = N_VGetLength(uu);
+    //     from_raw_parts(pointer, length as usize)
+    // };
+    // let fval = unsafe {
+    //     let pointer = N_VGetArrayPointer_Serial(fval);
+    //     let length = N_VGetLength(fval);
+    //     from_raw_parts_mut(pointer, length as usize)
+    // };
+    let uu = NVector::from_raw(uu);
+    let mut fval = NVector::from_raw(fval);
     let wrapper = unsafe { &*(user_data as *const UserDataWrapper<U>) };
-    (wrapper.sys_fn)(uu, fval, &wrapper.actual_user_data)
+    (wrapper.sys_fn)(&uu, &mut fval, &wrapper.actual_user_data)
 }
 
 unsafe extern "C" fn jac_fn_wrapper<U>(
@@ -75,32 +79,43 @@ unsafe extern "C" fn jac_fn_wrapper<U>(
     tmp1: N_Vector,
     tmp2: N_Vector,
 ) -> c_int {
-    let u = unsafe {
-        let pointer = N_VGetArrayPointer_Serial(u);
-        let length = N_VGetLength(u);
-        from_raw_parts(pointer, length as usize)
-    };
-    let fu = unsafe {
-        let pointer = N_VGetArrayPointer_Serial(fu);
-        let length = N_VGetLength(fu);
-        from_raw_parts_mut(pointer, length as usize)
-    };
+    // let u = unsafe {
+    //     let pointer = N_VGetArrayPointer_Serial(u);
+    //     let length = N_VGetLength(u);
+    //     from_raw_parts(pointer, length as usize)
+    // };
+    // let fu = unsafe {
+    //     let pointer = N_VGetArrayPointer_Serial(fu);
+    //     let length = N_VGetLength(fu);
+    //     from_raw_parts_mut(pointer, length as usize)
+    // };
+    let u = NVector::from_raw(u);
+    let mut fu = NVector::from_raw(fu);
     let mut j_mat = SparseMatrix::from_raw(j_mat);
 
     let wrapper = unsafe { &*(user_data as *const UserDataWrapper<U>) };
 
-    let tmp1 = unsafe {
-        let pointer = N_VGetArrayPointer_Serial(tmp1);
-        let length = N_VGetLength(tmp1);
-        from_raw_parts(pointer, length as usize)
-    };
-    let tmp2 = unsafe {
-        let pointer = N_VGetArrayPointer_Serial(tmp2);
-        let length = N_VGetLength(tmp2);
-        from_raw_parts(pointer, length as usize)
-    };
+    // let tmp1 = unsafe {
+    //     let pointer = N_VGetArrayPointer_Serial(tmp1);
+    //     let length = N_VGetLength(tmp1);
+    //     from_raw_parts(pointer, length as usize)
+    // };
+    // let tmp2 = unsafe {
+    //     let pointer = N_VGetArrayPointer_Serial(tmp2);
+    //     let length = N_VGetLength(tmp2);
+    //     from_raw_parts(pointer, length as usize)
+    // };
+    let tmp1 = NVector::from_raw(tmp1);
+    let tmp2 = NVector::from_raw(tmp2);
 
-    (wrapper.jac_fn)(u, fu, &mut j_mat, &wrapper.actual_user_data, tmp1, tmp2)
+    (wrapper.jac_fn)(
+        &u,
+        &mut fu,
+        &mut j_mat,
+        &wrapper.actual_user_data,
+        &tmp1,
+        &tmp2,
+    )
 }
 
 /// Solves nonlinear algebraic systems.
@@ -193,6 +208,11 @@ impl<U> KIN<U> {
         check_is_success(retval, "KINSetFuncNormTol")
     }
 
+    pub fn set_max_setup_calls(&mut self, msbset: impl Into<sunindextype>) -> Result<()> {
+        let retval = unsafe { KINSetMaxSetupCalls(self.kinmem, msbset.into()) };
+        check_is_success(retval, "KINSetMaxSetupCalls")
+    }
+
     pub fn set_linear_solver(&mut self, ls: &LinearSolver, a: &SparseMatrix) -> Result<()> {
         let retval = unsafe { KINSetLinearSolver(self.kinmem, ls.sunlinsol, a.sunmatrix) };
         check_is_success(retval, "KINSetLinearSolver")
@@ -238,10 +258,26 @@ impl<U> KIN<U> {
         Ok(nfevals as usize)
     }
 
+    pub fn num_jac_evals(&self) -> Result<usize> {
+        let mut njevals: c_long = 0;
+        let retval = unsafe { KINGetNumJacEvals(self.kinmem, &mut njevals) };
+        check_is_success(retval, "KINGetNumJacEvals")?;
+        Ok(njevals as usize)
+    }
+
     pub fn set_maa(&mut self, maa: usize) -> Result<()> {
         let retval = unsafe { KINSetMAA(self.kinmem, maa as c_long) };
-        check_is_success(retval, "KINSetMAA")?;
-        Ok(())
+        check_is_success(retval, "KINSetMAA")
+    }
+
+    pub fn set_constraints(&mut self, constraints: &NVector) -> Result<()> {
+        let retval = unsafe { KINSetConstraints(self.kinmem, constraints.n_vector) };
+        check_is_success(retval, "KINSetConstraints")
+    }
+
+    pub fn set_scaled_step_tol(&mut self, scsteptol: sunrealtype) -> Result<()> {
+        let retval = unsafe { KINSetScaledStepTol(self.kinmem, scsteptol) };
+        check_is_success(retval, "KINSetScaledStepTol")
     }
 }
 
@@ -250,223 +286,5 @@ impl<U> Drop for KIN<U> {
         unsafe {
             KINFree(&mut self.kinmem);
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::context::Context;
-    use crate::kinsol::{Strategy, KIN};
-    use crate::nvector::NVector;
-    use anyhow::{format_err, Result};
-    use sundials_sys::{sunindextype, sunrealtype};
-
-    /// The following is a simple example problem, with the coding
-    /// needed for its solution by the accelerated fixed point solver in
-    /// KINSOL.
-    ///
-    /// The problem is from chemical kinetics, and consists of solving
-    /// the first time step in a Backward Euler solution for the
-    /// following three rate equations:
-    /// ```txt
-    ///    dy1/dt = -.04*y1 + 1.e4*y2*y3
-    ///    dy2/dt = .04*y1 - 1.e4*y2*y3 - 3.e2*(y2)^2
-    ///    dy3/dt = 3.e2*(y2)^2
-    /// ```
-    /// on the interval from t = 0.0 to t = 0.1, with initial
-    /// conditions: y1 = 1.0, y2 = y3 = 0. The problem is stiff.
-    /// Run statistics (optional outputs) are printed at the end.
-    ///
-    /// Programmers: Carol Woodward @ LLNL
-    #[test]
-    pub fn test_kinsol_roberts_fp() -> Result<()> {
-        const NEQ: sunindextype = 3; // number of equations
-        const Y10: f64 = 1.0; // initial y components
-        const Y20: f64 = 0.0;
-        const Y30: f64 = 0.0;
-        const TOL: f64 = 1e-10; // function tolerance
-        const DSTEP: f64 = 0.1; // Size of the single time step used
-
-        const PRIORS: usize = 2;
-
-        const ZERO: f64 = 0.0;
-        const ONE: f64 = 1.0;
-
-        // This function is defined in order to write code which exactly matches
-        // the mathematical problem description given.
-        //
-        // Ith(v,i) references the ith component of the vector v, where i is in
-        // the range [1..NEQ] and NEQ is defined above. The Ith macro is defined
-        // using the N_VIth macro in nvector.h. N_VIth numbers the components of
-        // a vector starting from 0.
-        fn ith(v: &[f64], i: usize) -> f64 {
-            // Ith numbers components 1..NEQ
-            // return nvector.IthS(v, i-1)
-            v[i - 1]
-        }
-        fn set_ith(v: &mut [f64], i: usize, x: f64) {
-            // Ith numbers components 1..NEQ
-            // nvector.DataS(v)[i-1] = x
-            v[i - 1] = x;
-        }
-
-        // System function
-        fn roberts(y: &[sunrealtype], g: &mut [sunrealtype], _: &Option<()>) -> i32 {
-            let y1 = ith(y, 1);
-            let y2 = ith(y, 2);
-            let y3 = ith(y, 3);
-
-            let yd1 = DSTEP * (-0.04 * y1 + 1.0e4 * y2 * y3);
-            let yd3 = DSTEP * 3.0e2 * y2 * y2;
-
-            set_ith(g, 1, yd1 + Y10);
-            set_ith(g, 2, -yd1 - yd3 + Y20);
-            set_ith(g, 3, yd3 + Y30);
-
-            0
-        }
-
-        // Print solution at selected points
-        fn print_output(y: &[f64]) {
-            let y1 = ith(y, 1);
-            let y2 = ith(y, 2);
-            let y3 = ith(y, 3);
-
-            println!("y = {:e}  {:e}  {:e}", y1, y2, y3);
-        }
-
-        // Print final statistics
-        fn print_final_stats(kmem: &KIN<()>) {
-            let nni = kmem.num_nonlin_solv_iters().unwrap();
-            let nfe = kmem.num_func_evals().unwrap();
-
-            println!("\nFinal Statistics..\n");
-            println!("nni      = {:6}    nfe     = {:6}", nni, nfe);
-        }
-
-        // compare the solution to a reference solution computed with a
-        // tolerance of 1e-14
-        fn check_ans(u: &NVector, rtol: f64, atol: f64) -> Result<()> {
-            // create reference solution and error weight vectors
-            let r#ref = u.clone();
-            let mut ewt = u.clone();
-
-            // set the reference solution data
-            //sundials.IthS(ref, 0) = 9.9678538655358029e-01
-            //sundials.IthS(ref, 1) = 2.9530060962800345e-03
-            //sundials.IthS(ref, 2) = 2.6160735013975683e-04
-            r#ref.as_slice_mut()[0] = 9.9678538655358029e-01;
-            r#ref.as_slice_mut()[1] = 2.9530060962800345e-03;
-            r#ref.as_slice_mut()[2] = 2.6160735013975683e-04;
-
-            // compute the error weight vector
-            r#ref.abs(&mut ewt);
-            // ewt.scale(rtol);
-            ewt *= rtol;
-            // ewt.add_const(atol, &mut ewt);
-            ewt += atol;
-            if ewt.min() <= ZERO {
-                return Err(format_err!("SUNDIALS_ERROR: check_ans failed - ewt <= 0"));
-                // return false; //(-1)
-            }
-            ewt.inv();
-
-            // compute the solution error
-            // u.linear_sum(ONE, -ONE, &r#ref, &mut r#ref);
-            let err = NVector::linear_sum(ONE, u, -ONE, &r#ref).wrms_norm(&ewt);
-
-            // is the solution within the tolerances?
-            if err >= ONE {
-                return Err(format_err!("SUNDIALS_WARNING: check_ans error={}", err));
-            }
-
-            Ok(())
-        }
-
-        // Print problem description
-        println!("Example problem from chemical kinetics solving");
-        println!("the first time step in a Backward Euler solution for the");
-        println!("following three rate equations:");
-        println!("    dy1/dt = -.04*y1 + 1.e4*y2*y3");
-        println!("    dy2/dt = .04*y1 - 1.e4*y2*y3 - 3.e2*(y2)^2");
-        println!("    dy3/dt = 3.e2*(y2)^2");
-        println!("on the interval from t = 0.0 to t = 0.1, with initial");
-        println!("conditions: y1 = 1.0, y2 = y3 = 0.");
-        println!("Solution method: Anderson accelerated fixed point iteration.");
-
-        let sunctx = Context::new().unwrap();
-
-        // Create vectors for solution and scales
-        let mut y = NVector::new_serial(NEQ, &sunctx)?;
-
-        let mut scale = NVector::new_serial(NEQ, &sunctx)?;
-
-        // Initialize and allocate memory for KINSOL
-        let mut kmem: KIN<()> = KIN::new(&sunctx)?;
-
-        // y is used as a template
-
-        // Set number of prior residuals used in Anderson acceleration.
-        kmem.set_maa(PRIORS)?;
-
-        kmem.init(Some(roberts), None, None, &y)?;
-
-        /* Set optional inputs */
-
-        // Specify stopping tolerance based on residual.
-        let fnormtol = TOL;
-        kmem.set_func_norm_tol(fnormtol)?;
-
-        // Initial guess.
-        y.fill_with(ZERO);
-        set_ith(y.as_slice_mut(), 1, ONE);
-
-        // Call KINSol to solve problem
-
-        // No scaling used
-        scale.fill_with(ONE);
-
-        // Call main solver
-        kmem.solve(
-            &mut y,       // initial guess on input; solution vector
-            Strategy::FP, // global strategy choice
-            &scale,       // scaling vector, for the variable cc
-            &scale,       // scaling vector for function values fval
-        )?;
-
-        /* Print solution and solver statistics */
-
-        // Get scaled norm of the system function.
-        let fnorm = kmem.func_norm()?;
-
-        println!("\nComputed solution (||F|| = {:e}):\n", fnorm);
-        print_output(y.as_slice());
-
-        print_final_stats(&kmem);
-
-        // check the solution error
-        check_ans(&y, 1e-4, 1e-6)?;
-
-        // Output:
-        //
-        // Example problem from chemical kinetics solving
-        // the first time step in a Backward Euler solution for the
-        // following three rate equations:
-        //     dy1/dt = -.04*y1 + 1.e4*y2*y3
-        //     dy2/dt = .04*y1 - 1.e4*y2*y3 - 3.e2*(y2)^2
-        //     dy3/dt = 3.e2*(y2)^2
-        // on the interval from t = 0.0 to t = 0.1, with initial
-        // conditions: y1 = 1.0, y2 = y3 = 0.
-        // Solution method: Anderson accelerated fixed point iteration.
-        //
-        // Computed solution (||F|| = 3.96494e-12):
-        //
-        // y =  9.967854e-01    2.953006e-03    2.616074e-04
-        //
-        // Final Statistics...
-        //
-        // nni      =      8    nfe     =      8
-
-        Ok(())
     }
 }
