@@ -55,16 +55,6 @@ fn empty_jac_fn<U>(
 }
 
 extern "C" fn sys_fn_wrapper<U>(uu: N_Vector, fval: N_Vector, user_data: *mut c_void) -> c_int {
-    // let uu = unsafe {
-    //     let pointer = N_VGetArrayPointer_Serial(uu);
-    //     let length = N_VGetLength(uu);
-    //     from_raw_parts(pointer, length as usize)
-    // };
-    // let fval = unsafe {
-    //     let pointer = N_VGetArrayPointer_Serial(fval);
-    //     let length = N_VGetLength(fval);
-    //     from_raw_parts_mut(pointer, length as usize)
-    // };
     let uu = NVector::from_raw(uu);
     let mut fval = NVector::from_raw(fval);
     let wrapper = unsafe { &*(user_data as *const UserDataWrapper<U>) };
@@ -79,32 +69,12 @@ unsafe extern "C" fn jac_fn_wrapper<U>(
     tmp1: N_Vector,
     tmp2: N_Vector,
 ) -> c_int {
-    // let u = unsafe {
-    //     let pointer = N_VGetArrayPointer_Serial(u);
-    //     let length = N_VGetLength(u);
-    //     from_raw_parts(pointer, length as usize)
-    // };
-    // let fu = unsafe {
-    //     let pointer = N_VGetArrayPointer_Serial(fu);
-    //     let length = N_VGetLength(fu);
-    //     from_raw_parts_mut(pointer, length as usize)
-    // };
     let u = NVector::from_raw(u);
     let mut fu = NVector::from_raw(fu);
     let mut j_mat = SparseMatrix::from_raw(j_mat);
 
     let wrapper = unsafe { &*(user_data as *const UserDataWrapper<U>) };
 
-    // let tmp1 = unsafe {
-    //     let pointer = N_VGetArrayPointer_Serial(tmp1);
-    //     let length = N_VGetLength(tmp1);
-    //     from_raw_parts(pointer, length as usize)
-    // };
-    // let tmp2 = unsafe {
-    //     let pointer = N_VGetArrayPointer_Serial(tmp2);
-    //     let length = N_VGetLength(tmp2);
-    //     from_raw_parts(pointer, length as usize)
-    // };
     let tmp1 = NVector::from_raw(tmp1);
     let tmp2 = NVector::from_raw(tmp2);
 
@@ -141,6 +111,7 @@ impl<U> KIN<U> {
     pub fn init(
         &mut self,
         sys_fn: Option<SysFn<U>>,
+        ls_a: Option<(&LinearSolver, &SparseMatrix)>,
         jac_fn: Option<JacFn<U>>,
         user_data: Option<U>,
         tmpl: &NVector,
@@ -156,6 +127,12 @@ impl<U> KIN<U> {
             )
         };
         check_is_success(retval, "KINInit")?;
+
+        if let Some((ls, a)) = ls_a {
+            // Linear solver must be set after KINInit, but before KINSetJacFn.
+            let retval = unsafe { KINSetLinearSolver(self.kinmem, ls.sunlinsol, a.sunmatrix) };
+            check_is_success(retval, "KINSetLinearSolver")?;
+        }
 
         self.wrapped_user_data = Box::pin(UserDataWrapper {
             actual_user_data: user_data,
@@ -185,24 +162,6 @@ impl<U> KIN<U> {
         Ok(())
     }
 
-    // pub fn set_jac_func(&mut self) {
-    //     unsafe { sundials_sys::KINSetJacFn(self.kinmem, jac) }
-    // }
-
-    // pub fn set_user_data(&mut self, user_data: U) -> Result<()> {
-    //     self.wrapped_user_data.actual_user_data = Some(user_data);
-    //
-    //     let retval = unsafe {
-    //         KINSetUserData(
-    //             self.kinmem,
-    //             &mut self.wrapped_user_data.as_ref().get_ref() as *mut _ as *mut c_void,
-    //         )
-    //     };
-    //     check_is_success(retval, "KINSetUserData")?;
-    //
-    //     Ok(())
-    // }
-
     pub fn set_func_norm_tol(&mut self, fnormtol: impl Into<sunrealtype>) -> Result<()> {
         let retval = unsafe { KINSetFuncNormTol(self.kinmem, fnormtol.into()) };
         check_is_success(retval, "KINSetFuncNormTol")
@@ -211,11 +170,6 @@ impl<U> KIN<U> {
     pub fn set_max_setup_calls(&mut self, msbset: impl Into<sunindextype>) -> Result<()> {
         let retval = unsafe { KINSetMaxSetupCalls(self.kinmem, msbset.into()) };
         check_is_success(retval, "KINSetMaxSetupCalls")
-    }
-
-    pub fn set_linear_solver(&mut self, ls: &LinearSolver, a: &SparseMatrix) -> Result<()> {
-        let retval = unsafe { KINSetLinearSolver(self.kinmem, ls.sunlinsol, a.sunmatrix) };
-        check_is_success(retval, "KINSetLinearSolver")
     }
 
     pub fn solve(

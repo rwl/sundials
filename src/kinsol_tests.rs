@@ -47,16 +47,11 @@ pub fn test_kinsol_roberts_fp() -> Result<()> {
     // using the N_VIth macro in nvector.h. N_VIth numbers the components of
     // a vector starting from 0.
     fn ith(v: &NVector, i: usize) -> f64 {
-        // fn ith(v: &[f64], i: usize) -> f64 {
-
         // Ith numbers components 1..NEQ
-        // return nvector.IthS(v, i-1)
         v.as_slice()[i - 1]
     }
-    // fn set_ith(v: &mut [f64], i: usize, x: f64) {
     fn set_ith(v: &mut NVector, i: usize, x: f64) {
         // Ith numbers components 1..NEQ
-        // nvector.DataS(v)[i-1] = x
         v.as_slice_mut()[i - 1] = x;
     }
 
@@ -117,12 +112,10 @@ pub fn test_kinsol_roberts_fp() -> Result<()> {
         ewt += atol;
         if ewt.min() <= ZERO {
             return Err(format_err!("SUNDIALS_ERROR: check_ans failed - ewt <= 0"));
-            // return false; //(-1)
         }
         ewt.inv();
 
         // compute the solution error
-        // u.linear_sum(ONE, -ONE, &r#ref, &mut r#ref);
         let err = NVector::linear_sum(ONE, u, -ONE, &r#ref).wrms_norm(&ewt);
 
         // is the solution within the tolerances?
@@ -159,7 +152,7 @@ pub fn test_kinsol_roberts_fp() -> Result<()> {
     // Set number of prior residuals used in Anderson acceleration.
     kmem.set_maa(PRIORS)?;
 
-    kmem.init(Some(roberts), None, None, &y)?;
+    kmem.init(Some(roberts), None, None, None, &y)?;
 
     /* Set optional inputs */
 
@@ -220,12 +213,6 @@ pub fn test_kinsol_roberts_fp() -> Result<()> {
     Ok(())
 }
 
-struct FerrarisTronconi {
-    lb: Vec<f64>,
-    ub: Vec<f64>,
-    nnz: sunindextype,
-}
-
 /// This example solves a nonlinear system from.
 ///
 /// Source: "Handbook of Test Problems in Local and Global Optimization",
@@ -267,14 +254,13 @@ struct FerrarisTronconi {
 ///
 /// Programmers: Radu Serban @ LLNL
 #[test]
-#[ignore] // FIXME: SetJacFn error
 fn test_fer_tron_kinsol() -> Result<()> {
     const NVAR: sunindextype = 2;
     const NEQ_FT: sunindextype = 3 * NVAR;
     const NNZ: sunindextype = 12;
 
-    const FTOL: f64 = 1e-5; /* function tolerance */
-    const STOL: f64 = 1e-5; /* step tolerance     */
+    const FTOL: f64 = 1e-5; // function tolerance
+    const STOL: f64 = 1e-5; // step tolerance
 
     const ZERO: f64 = 0.0;
     const PT25: f64 = 0.25;
@@ -286,14 +272,15 @@ fn test_fer_tron_kinsol() -> Result<()> {
     const PI: f64 = 3.1415926;
     const E: f64 = 2.7182818;
 
+    struct FerrarisTronconi {
+        lb: Vec<f64>,
+        ub: Vec<f64>,
+        nnz: sunindextype,
+    }
+
     // System function for predator-prey system
     #[allow(non_snake_case)]
     fn fer_tron_func(u: &NVector, f: &mut NVector, user_data: &Option<FerrarisTronconi>) -> i32 {
-        // var udata, fdata []float64
-        // var x1, l1, L1, x2, l2, L2 float64
-        // var lb, ub []float64
-        // var params *FerrarisTronconi
-
         let params = user_data.as_ref().unwrap();
         let lb = &params.lb;
         let ub = &params.ub;
@@ -330,12 +317,7 @@ fn test_fer_tron_kinsol() -> Result<()> {
     ) -> i32 {
         J.zero().unwrap();
 
-        // var yd []float64
         let (rowptrs, colvals, data) = J.index_pointers_values_data_mut();
-        // let rowptrs = J.index_pointers_mut();
-        // let colvals = J.index_values_mut();
-        // let data = J.data_mut();
-
         let yd = y.as_slice();
 
         rowptrs[0] = 0;
@@ -346,37 +328,37 @@ fn test_fer_tron_kinsol() -> Result<()> {
         rowptrs[5] = 10;
         rowptrs[6] = 12;
 
-        /* row 0: J(0,0) and J(0,1) */
+        // row 0: J(0,0) and J(0,1)
         data[0] = PT5 * f64::cos(yd[0] * yd[1]) * yd[1] - PT5;
         colvals[0] = 0;
         data[1] = PT5 * f64::cos(yd[0] * yd[1]) * yd[0] - PT25 / PI;
         colvals[1] = 1;
 
-        /* row 1: J(1,0) and J(1,1) */
+        // row 1: J(1,0) and J(1,1)
         data[2] = TWO * (ONE - PT25 / PI) * (f64::exp(TWO * yd[0]) - E);
         colvals[2] = 0;
         data[3] = E / PI;
         colvals[3] = 1;
 
-        /* row 2: J(2,0) and J(2,2) */
+        // row 2: J(2,0) and J(2,2)
         data[4] = -ONE;
         colvals[4] = 0;
         data[5] = ONE;
         colvals[5] = 2;
 
-        /* row 3: J(3,0) and J(3,3) */
+        // row 3: J(3,0) and J(3,3)
         data[6] = -ONE;
         colvals[6] = 0;
         data[7] = ONE;
         colvals[7] = 3;
 
-        /* row 4: J(4,1) and J(4,4) */
+        // row 4: J(4,1) and J(4,4)
         data[8] = -ONE;
         colvals[8] = 1;
         data[9] = ONE;
         colvals[9] = 4;
 
-        /* row 5: J(5,1) and J(5,5) */
+        // row 5: J(5,1) and J(5,5)
         data[10] = -ONE;
         colvals[10] = 1;
         data[11] = ONE;
@@ -386,18 +368,14 @@ fn test_fer_tron_kinsol() -> Result<()> {
     }
 
     fn set_initial_guess1(u: &mut NVector, data: &FerrarisTronconi) {
-        // var x1, x2 float64
-        // var udata []float64
-        // var lb, ub []float64
-
         let udata = u.as_slice_mut();
 
         let lb = &data.lb;
         let ub = &data.ub;
 
-        /* There are two known solutions for this problem */
+        // There are two known solutions for this problem
 
-        /* this init. guess should take us to (0.29945; 2.83693) */
+        // this initial guess should take us to (0.29945; 2.83693)
         let x1 = lb[0];
         let x2 = lb[1];
 
@@ -410,18 +388,14 @@ fn test_fer_tron_kinsol() -> Result<()> {
     }
 
     fn set_initial_guess2(u: &NVector, data: &FerrarisTronconi) {
-        // var x1, x2 float64
-        // var udata []float64
-        // var lb, ub []float64
-
         let udata = u.as_slice_mut();
 
         let lb = &data.lb;
         let ub = &data.ub;
 
-        /* There are two known solutions for this problem */
+        // There are two known solutions for this problem
 
-        /* this init. guess should take us to (0.5; 3.1415926) */
+        // this initial guess should take us to (0.5; 3.1415926)
         let x1 = PT5 * (lb[0] + ub[0]);
         let x2 = PT5 * (lb[1] + ub[1]);
 
@@ -433,48 +407,12 @@ fn test_fer_tron_kinsol() -> Result<()> {
         udata[5] = x2 - ub[1];
     }
 
-    // // Check function return value...
-    // //    opt == 0 means SUNDIALS function allocates memory so check if
-    // //             returned NULL pointer
-    // //    opt == 1 means SUNDIALS function returns a flag so check if
-    // //             flag >= 0
-    // //    opt == 2 means function allocates memory so check if returned
-    // //             NULL pointer
-    // check := func(flagvalue interface{}, funcname string, opt int) bool {
-    //     var errflag *int
-    //
-    //     // Check if SUNDIALS function returned NULL pointer - no memory allocated
-    //     if opt == 0 && flagvalue == nil {
-    //         fmt.Fprintf(os.Stderr,
-    //             "\nSUNDIALS_ERROR: %s() failed - returned NULL pointer\n\n",
-    //             funcname)
-    //         return true
-    //     } else if opt == 1 {
-    //         // Check if flag < 0
-    //         errflag = flagvalue.(*int)
-    //         if *errflag < 0 {
-    //             fmt.Fprintf(os.Stderr,
-    //                 "\nSUNDIALS_ERROR: %s() failed with flag = %d\n\n",
-    //                 funcname, *errflag)
-    //             return true
-    //         }
-    //     } else if opt == 2 && flagvalue == nil {
-    //         // Check if function returned NULL pointer - no memory allocated
-    //         fmt.Fprintf(os.Stderr,
-    //             "\nMEMORY_ERROR: %s() failed - returned NULL pointer\n\n",
-    //             funcname)
-    //         return true
-    //     }
-    //
-    //     return false
-    // }
-
     // Print first lines of output (problem description).
     fn print_header(fnormtol: f64, scsteptol: f64) {
         println!("\nFerraris and Tronconi test problem");
         println!("Tolerance parameters:");
         println!(
-            "  fnormtol  = {:16.6}\n  scsteptol = {}",
+            "  fnormtol  = {:16.6}\n  scsteptol = {:16.6}",
             fnormtol, scsteptol
         );
     }
@@ -524,15 +462,8 @@ fn test_fer_tron_kinsol() -> Result<()> {
         }
 
         kmem.set_max_setup_calls(mset as i64)?;
-        // flag = kmem.SetMaxSetupCalls(int64(mset))
-        // if check(&flag, "KINSetMaxSetupCalls", 1) {
-        //     return 1
-        // }
 
         kmem.solve(u, glstr, s, s)?;
-        // if check(&flag, "Solve", 1) {
-        //     return 1
-        // }
 
         print!("Solution:\n  [x1,x2] = ");
         print_output(u);
@@ -541,14 +472,6 @@ fn test_fer_tron_kinsol() -> Result<()> {
 
         Ok(())
     }
-
-    // var data *FerrarisTronconi
-    // var fnormtol, scsteptol float64
-    // var u1, u2, u, s, c *nvector.NVector
-    // var glstr, mset, flag int
-    // var kmem *kinsol.KIN
-    // var J *sunmatrix.SUNMatrix
-    // var LS *sunlinsol.LinearSolver
 
     let mut data = FerrarisTronconi {
         lb: vec![0.0; NVAR as usize],
@@ -565,29 +488,10 @@ fn test_fer_tron_kinsol() -> Result<()> {
     let sunctx = Context::new()?;
 
     let mut u1 = NVector::new_serial(NEQ_FT, &sunctx)?;
-    // if check(u1, "NewSerial", 0) {
-    //     return //(1)
-    // }
-
     let mut u2 = NVector::new_serial(NEQ_FT, &sunctx)?;
-    // if check(u2, "NewSerial", 0) {
-    //     return //(1)
-    // }
-
     let mut u = NVector::new_serial(NEQ_FT, &sunctx)?;
-    // if check(u, "NewSerial", 0) {
-    //     return //(1)
-    // }
-
     let mut s = NVector::new_serial(NEQ_FT, &sunctx)?;
-    // if check(s, "NewSerial", 0) {
-    //     return //(1)
-    // }
-
     let c = NVector::new_serial(NEQ_FT, &sunctx)?;
-    // if check(c, "NewSerial", 0) {
-    //     return //(1)
-    // }
 
     set_initial_guess1(&mut u1, &data);
     set_initial_guess2(&mut u2, &data);
@@ -608,58 +512,27 @@ fn test_fer_tron_kinsol() -> Result<()> {
     let scsteptol = STOL;
 
     let mut kmem: KIN<FerrarisTronconi> = KIN::new(&sunctx)?;
-    // if check(kmem, "NewKIN", 0) {
-    //     return //(1)
-    // }
 
-    // flag = kmem.SetUserData(data)
-    // if check(&flag, "KINSetUserData", 1) {
-    //     return //(1)
-    // }
     kmem.set_constraints(&c)?;
-    // if check(&flag, "KINSetConstraints", 1) {
-    //     return //(1)
-    // }
     kmem.set_func_norm_tol(fnormtol)?;
-    // if check(&flag, "KINSetFuncNormTol", 1) {
-    //     return //(1)
-    // }
     kmem.set_scaled_step_tol(scsteptol)?;
-    // if check(&flag, "KINSetScaledStepTol", 1) {
-    //     return //(1)
-    // }
-
-    kmem.init(Some(fer_tron_func), Some(fer_tron_jac), Some(data), &u)?;
-    // if check(&flag, "Init", 1) {
-    //     return //(1)
-    // }
 
     // Create sparse SUNMatrix
     #[allow(non_snake_case)]
     let J = SparseMatrix::new(NEQ_FT, NEQ_FT, NNZ, SparseType::CSR, &sunctx);
-    // if check(J, "SUNSparseMatrix", 0) {
-    //     return //(1)
-    // }
 
     // Create KLU solver object
-    // let LS = LinearSolver::new_klu(&u, &J, &sunctx);
     #[allow(non_snake_case)]
     let LS = LinearSolver::new_faer(&u, &J, &sunctx);
-    // if check(LS, "NewKLU", 0) {
-    //     return //(1)
-    // }
+    // let LS = LinearSolver::new_klu(&u, &J, &sunctx);
 
-    // Attach KLU linear solver
-    kmem.set_linear_solver(&LS, &J)?;
-    // if check(&flag, "SetLinearSolver", 1) {
-    //     return //(1)
-    // }
-
-    // Set the Jacobian function
-    // kmem.set_jac_fn(fer_tron_jac)?;
-    // if check(&flag, "SetJacFn", 1) {
-    //     return //(1)
-    // }
+    kmem.init(
+        Some(fer_tron_func),
+        Some((&LS, &J)),
+        Some(fer_tron_jac),
+        Some(data),
+        &u,
+    )?;
 
     // Print out the problem size, solution parameters, initial guess.
     print_header(fnormtol, scsteptol);
