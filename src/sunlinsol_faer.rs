@@ -3,7 +3,6 @@ use crate::nvector::NVector;
 use crate::sunlinsol::LinearSolver;
 use crate::sunmatrix::{SparseMatrix, SparseType};
 
-use std::alloc::{alloc, Layout};
 use std::os::raw::{c_int, c_long, c_void};
 use std::ptr::null_mut;
 
@@ -41,6 +40,7 @@ macro_rules! content {
     }};
 }
 
+#[repr(C)]
 struct SUNLinearSolverContentFaer {
     last_flag: c_int,
     first_factorize: bool,
@@ -92,8 +92,15 @@ pub unsafe extern "C" fn sunlinsol_faer(
     (*(*s).ops).free = Some(sunlinsol_free_faer);
 
     // Create content //
-    let content: *mut SUNLinearSolverContentFaer =
-        alloc(Layout::new::<SUNLinearSolverContentFaer>()) as *mut SUNLinearSolverContentFaer;
+    let content_box = Box::new(SUNLinearSolverContentFaer {
+        last_flag: 0,
+        first_factorize: true,
+        factors: None,
+        row_perm: None,
+        col_perm: None,
+        transpose: false,
+    });
+    let content = Box::into_raw(content_box);
     if content.is_null() {
         SUNLinSolFree(s);
         return null_mut();
@@ -177,7 +184,7 @@ unsafe extern "C" fn sunlinsol_setup_faer(s: SUNLinearSolver, a_mat: SUNMatrix) 
         a_sym.clone(),
         control,
         PodStack::new(&mut GlobalPodBuffer::new(
-            amd::order_req::<usize>(m, n).unwrap(),
+            amd::order_req::<usize>(n, a_mat.nnz()).unwrap(),
         )),
     )
     .unwrap();
@@ -324,7 +331,8 @@ unsafe extern "C" fn sunlinsol_free_faer(s: SUNLinearSolver) -> SUNErrCode {
 
     // Delete items from the contents structure (if it exists).
     if !(*s).content.is_null() {
-        sundials_sys::free((*s).content);
+        // Convert back to Box, which will drop when it goes out of scope
+        let _ = Box::from_raw((*s).content as *mut SUNLinearSolverContentFaer);
         (*s).content = null_mut();
     }
 
@@ -369,7 +377,7 @@ mod tests {
         let mut b = NVector::new_serial(n, &sunctx).unwrap();
 
         a_mat.mat_vec(&x, &mut b).unwrap();
-        b.print();
+        // b.print();
 
         x.fill_with(0.0);
         // x.print();

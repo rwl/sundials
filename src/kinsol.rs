@@ -5,8 +5,8 @@ use std::pin::Pin;
 use sundials_sys::{
     sunindextype, sunrealtype, KINCreate, KINFree, KINGetFuncNorm, KINGetNumFuncEvals,
     KINGetNumJacEvals, KINGetNumNonlinSolvIters, KINInit, KINSetConstraints, KINSetFuncNormTol,
-    KINSetJacFn, KINSetLinearSolver, KINSetMAA, KINSetMaxSetupCalls, KINSetScaledStepTol,
-    KINSetUserData, KINSol, N_Vector, SUNMatrix,
+    KINSetJacFn, KINSetLinearSolver, KINSetMAA, KINSetMaxSetupCalls, KINSetNumMaxIters,
+    KINSetScaledStepTol, KINSetUserData, KINSol, N_Vector, SUNMatrix,
 };
 
 use crate::check::{check_is_success, check_non_null};
@@ -165,6 +165,11 @@ impl<U> KIN<U> {
     pub fn set_func_norm_tol(&mut self, fnormtol: impl Into<sunrealtype>) -> Result<()> {
         let retval = unsafe { KINSetFuncNormTol(self.kinmem, fnormtol.into()) };
         check_is_success(retval, "KINSetFuncNormTol")
+    }
+
+    pub fn set_num_max_iters(&mut self, mxiter: impl Into<sunindextype>) -> Result<()> {
+        let retval = unsafe { KINSetNumMaxIters(self.kinmem, mxiter.into()) };
+        check_is_success(retval, "KINSetNumMaxIters")
     }
 
     pub fn set_max_setup_calls(&mut self, msbset: impl Into<sunindextype>) -> Result<()> {
