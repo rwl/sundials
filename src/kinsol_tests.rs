@@ -523,8 +523,10 @@ fn test_fer_tron_kinsol() -> Result<()> {
 
     // Create KLU solver object
     #[allow(non_snake_case)]
+    #[cfg(not(feature = "klu"))]
     let LS = LinearSolver::new_faer(&u, &J, &sunctx);
-    // let LS = LinearSolver::new_klu(&u, &J, &sunctx);
+    #[cfg(feature = "klu")]
+    let LS = LinearSolver::new_klu(&u, &J, &sunctx);
 
     kmem.init(
         Some(fer_tron_func),

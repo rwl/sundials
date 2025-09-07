@@ -168,12 +168,12 @@ impl<U> KIN<U> {
     }
 
     pub fn set_num_max_iters(&mut self, mxiter: impl Into<sunindextype>) -> Result<()> {
-        let retval = unsafe { KINSetNumMaxIters(self.kinmem, mxiter.into()) };
+        let retval = unsafe { KINSetNumMaxIters(self.kinmem, mxiter.try_into()?) };
         check_is_success(retval, "KINSetNumMaxIters")
     }
 
     pub fn set_max_setup_calls(&mut self, msbset: impl Into<sunindextype>) -> Result<()> {
-        let retval = unsafe { KINSetMaxSetupCalls(self.kinmem, msbset.into()) };
+        let retval = unsafe { KINSetMaxSetupCalls(self.kinmem, msbset.try_into()?) };
         check_is_success(retval, "KINSetMaxSetupCalls")
     }
 
