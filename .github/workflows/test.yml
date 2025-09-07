@@ -31,8 +31,19 @@ jobs:
       - run: |
           git clone https://github.com/microsoft/vcpkg
           & .\vcpkg\bootstrap-vcpkg.bat
+      - name: Create vcpkg-configuration.json
+        shell: pwsh
+        run: |
+          @'
+          {
+            "registries": [
+              { "kind": "git", "repository": "https://github.com/pybamm-team/sundials-vcpkg-registry.git", "packages": [ "sundials" ] }
+            ]
+          }
+          '@ | Set-Content -Path vcpkg/vcpkg-configuration.json
+      - run: |
           & .\vcpkg\vcpkg install sundials --triplet=x64-windows
       - run: cargo test
       - run: cargo test --features build_sundials
-#      - run: cargo test --features klu
+      - run: cargo test --features klu
 #      - run: cargo test --features build_sundials,klu
