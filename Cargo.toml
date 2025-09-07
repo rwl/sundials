@@ -8,9 +8,11 @@ repository = "https://github.com/rwl/sundials"
 
 [dependencies]
 anyhow = "1"
-sundials-sys = { version = "0.5.1", features = ["build_libraries", "static_libraries"] }
-faer = { version = "0.19", optional = true }
+sundials-sys = { version = "0.6" }
+faer = { version = "0.22", optional = true }
 
 [features]
 default = ["faer"]
+build_sundials = ["sundials-sys/build_libraries"]
+static_sundials = ["sundials-sys/static_libraries"]
 klu = ["sundials-sys/klu"]

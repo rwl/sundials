@@ -6,14 +6,13 @@ use crate::sunmatrix::{SparseMatrix, SparseType};
 use std::os::raw::{c_int, c_long, c_void};
 use std::ptr::null_mut;
 
-use faer::dyn_stack::{GlobalPodBuffer, PodStack};
-use faer::perm::Perm;
-use faer::sparse::linalg::amd;
+use faer::dyn_stack::{MemBuffer, MemStack};
+use faer::perm::{Perm, PermRef};
 use faer::sparse::linalg::lu::simplicial::{
-    factorize_simplicial_numeric_lu, factorize_simplicial_numeric_lu_req, SimplicialLu,
+    factorize_simplicial_numeric_lu, factorize_simplicial_numeric_lu_scratch, SimplicialLu,
 };
 use faer::sparse::{SparseColMatRef, SymbolicSparseColMatRef};
-use faer::{Conj, Mat, Parallelism};
+use faer::{Conj, Mat, Par};
 
 use sundials_sys::{
     sunindextype, sunrealtype, N_VGetArrayPointer, N_VGetLength, N_VGetVectorID, N_VScale,
@@ -161,6 +160,7 @@ unsafe extern "C" fn sunlinsol_setup_faer(s: SUNLinearSolver, a_mat: SUNMatrix) 
 
     let a_mat = SparseMatrix::from_raw(a_mat);
     let (m, n) = (a_mat.rows(), a_mat.columns());
+    let nnz = a_mat.nnz();
 
     let col_ptrs = a_mat
         .index_pointers()
@@ -177,33 +177,36 @@ unsafe extern "C" fn sunlinsol_setup_faer(s: SUNLinearSolver, a_mat: SUNMatrix) 
     let mut row_perm_inv = vec![0usize; n];
     let mut col_perm = vec![0usize; n];
     let mut col_perm_inv = vec![0usize; n];
-    let control = amd::Control::default();
-    amd::order(
+    let control = faer::sparse::linalg::amd::Control::default();
+
+    let mut mem =
+        MemBuffer::try_new(faer::sparse::linalg::amd::order_scratch::<usize>(n, nnz)).unwrap();
+    faer::sparse::linalg::amd::order(
         &mut col_perm,
         &mut col_perm_inv,
         a_sym.clone(),
         control,
-        PodStack::new(&mut GlobalPodBuffer::new(
-            amd::order_req::<usize>(n, a_mat.nnz()).unwrap(),
-        )),
+        MemStack::new(&mut mem),
     )
     .unwrap();
 
     // Compute the LU factorization of the matrix.
+    let mut mem = MemBuffer::try_new(factorize_simplicial_numeric_lu_scratch::<usize, f64>(
+        n, nnz,
+    ))
+    .unwrap();
+    let stack = MemStack::new(&mut mem);
 
     let a_ref = SparseColMatRef::<'_, usize, sunrealtype>::new(a_sym, &a_mat.data());
-    // let col_perm = PermRef::<'_, usize>::new_checked(&col_perm, &col_perm_inv);
-    let col_perm = Perm::<usize>::new_checked(Box::from(col_perm), Box::from(col_perm_inv));
+    let col_perm_ref = PermRef::<'_, usize>::new_checked(&col_perm, &col_perm_inv, n);
     let mut lu: SimplicialLu<usize, sunrealtype> = SimplicialLu::new();
     factorize_simplicial_numeric_lu(
         &mut row_perm,
         &mut row_perm_inv,
         &mut lu,
         a_ref,
-        col_perm.as_ref(),
-        PodStack::new(&mut GlobalPodBuffer::new(
-            factorize_simplicial_numeric_lu_req::<usize, sunrealtype>(m, n).unwrap(),
-        )),
+        col_perm_ref,
+        stack,
     )
     .unwrap();
 
@@ -211,8 +214,13 @@ unsafe extern "C" fn sunlinsol_setup_faer(s: SUNLinearSolver, a_mat: SUNMatrix) 
     content!(s).row_perm = Some(Perm::<usize>::new_checked(
         Box::from(row_perm),
         Box::from(row_perm_inv),
+        n,
     ));
-    content!(s).col_perm = Some(col_perm);
+    content!(s).col_perm = Some(Perm::<usize>::new_checked(
+        Box::from(col_perm),
+        Box::from(col_perm_inv),
+        n,
+    ));
 
     //     content!(s).first_factorize = false;
     // } else {
@@ -284,7 +292,7 @@ unsafe extern "C" fn sunlinsol_solve_faer(
             col_perm,
             Conj::No,
             rhs.as_mut(),
-            Parallelism::None,
+            Par::Seq,
             work.as_mut(),
         ),
         SparseType::CSR => f.solve_transpose_in_place_with_conj(
@@ -292,7 +300,7 @@ unsafe extern "C" fn sunlinsol_solve_faer(
             col_perm,
             Conj::No,
             rhs.as_mut(),
-            Parallelism::None,
+            Par::Seq,
             work.as_mut(),
         ),
     }
