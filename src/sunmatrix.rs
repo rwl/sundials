@@ -6,11 +6,10 @@ use anyhow::Result;
 use std::os::raw::c_int;
 use std::slice::{from_raw_parts, from_raw_parts_mut};
 use sundials_sys::{
-    stdout, sunindextype, sunrealtype, SUNMatDestroy_Sparse, SUNMatMatvec_Sparse, SUNMatZero,
-    SUNMatrix, SUNSparseMatrix, SUNSparseMatrix_Columns, SUNSparseMatrix_Data,
-    SUNSparseMatrix_IndexPointers, SUNSparseMatrix_IndexValues, SUNSparseMatrix_NNZ,
-    SUNSparseMatrix_Print, SUNSparseMatrix_Reallocate, SUNSparseMatrix_Rows,
-    SUNSparseMatrix_SparseType,
+    sunindextype, sunrealtype, SUNMatDestroy_Sparse, SUNMatMatvec_Sparse, SUNMatZero, SUNMatrix,
+    SUNSparseMatrix, SUNSparseMatrix_Columns, SUNSparseMatrix_Data, SUNSparseMatrix_IndexPointers,
+    SUNSparseMatrix_IndexValues, SUNSparseMatrix_NNZ, SUNSparseMatrix_Reallocate,
+    SUNSparseMatrix_Rows, SUNSparseMatrix_SparseType,
 };
 
 pub enum SparseType {
@@ -165,10 +164,6 @@ impl SparseMatrix {
     pub fn zero(&mut self) -> Result<()> {
         let retval = unsafe { SUNMatZero(self.sunmatrix) };
         check_is_success(retval, "SUNMatZero")
-    }
-
-    pub fn print(&self) {
-        unsafe { SUNSparseMatrix_Print(self.sunmatrix, stdout) }
     }
 }
 
