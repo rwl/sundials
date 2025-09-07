@@ -1,0 +1,38 @@
+name: Cargo Test
+on: [ push, pull_request ]
+
+jobs:
+  ubuntu:
+    name: Test Ubuntu
+    runs-on: ubuntu
+    steps:
+      - uses: actions/checkout@master
+      - run: |
+          rustup update --no-self-update
+          rustup default stable-x86_64-unknown-linux-gnu
+      - run: sudo apt-get update && sudo apt-get -y install libsundials-dev libsuitesparse-dev pkg-config
+      - run: cargo test
+      - run: cargo test --features build_sundials
+      - run: cargo test --features static_sundials
+      - run: cargo test --features build_sundials,static_sundials
+      - run: cargo test --features klu
+      - run: cargo test --features build_sundials,klu
+      - run: cargo test --features static_sundials,klu
+      - run: cargo test --features build_sundials,static_sundials,klu
+
+  windows:
+    name: Test Windows
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@master
+      - run: |
+          rustup update --no-self-update
+          rustup default stable-x86_64-pc-windows-msvc
+      - run: |
+          git clone https://github.com/microsoft/vcpkg
+          & .\vcpkg\bootstrap-vcpkg.bat
+          & .\vcpkg\vcpkg install sundials --triplet=x64-windows
+      - run: cargo test
+      - run: cargo test --features build_sundials
+#      - run: cargo test --features klu
+#      - run: cargo test --features build_sundials,klu
