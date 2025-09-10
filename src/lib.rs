@@ -7,6 +7,8 @@ pub mod nvector;
 pub mod sunlinsol;
 #[cfg(feature = "faer")]
 pub mod sunlinsol_faer;
+#[cfg(feature = "klu2")]
+pub mod sunlinsol_klu2;
 pub mod sunmatrix;
 
 #[cfg(test)]

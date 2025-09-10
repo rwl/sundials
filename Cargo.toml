@@ -10,9 +10,12 @@ repository = "https://github.com/rwl/sundials"
 anyhow = "1"
 sundials-sys = { version = "0.6" }
 faer = { version = "0.22", optional = true }
+suitesparse_sys = { version = "0.1.4", features = ["klu"], optional = true }
 
 [features]
 default = ["faer"]
 build_sundials = ["sundials-sys/build_libraries"]
 static_sundials = ["sundials-sys/static_libraries"]
 klu = ["sundials-sys/klu"]
+klu2 = ["suitesparse_sys"]
+suitesparse_vendor = ["suitesparse_sys/build_vendor"]
