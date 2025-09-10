@@ -1,6 +1,6 @@
 [package]
 name = "sundials"
-version = "0.3.1"
+version = "0.3.2"
 description = "Suite of nonlinear and differential/algebraic equation solvers"
 license = "BSD-3-Clause"
 edition = "2021"
