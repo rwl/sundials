@@ -1,6 +1,6 @@
 [package]
 name = "sundials"
-version = "0.4.0"
+version = "0.4.1"
 description = "Suite of nonlinear and differential/algebraic equation solvers"
 license = "BSD-3-Clause"
 edition = "2021"
@@ -9,7 +9,7 @@ repository = "https://github.com/rwl/sundials"
 [dependencies]
 anyhow = "1"
 sundials-sys = { version = "0.6" }
-faer = { version = "0.22", optional = true }
+faer = { version = "0.23", optional = true }
 suitesparse_sys = { version = "0.1.4", features = ["klu"], optional = true }
 
 [features]
