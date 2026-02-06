@@ -238,6 +238,19 @@ impl<U> KIN<U> {
         let retval = unsafe { KINSetScaledStepTol(self.kinmem, scsteptol) };
         check_is_success(retval, "KINSetScaledStepTol")
     }
+
+    pub fn user_data(self) -> Option<U> {
+        use std::mem::ManuallyDrop;
+        use std::ptr;
+
+        let mut me = ManuallyDrop::new(self);
+        unsafe {
+            KINFree(&mut me.kinmem);
+            let wrapper = Pin::into_inner_unchecked(ptr::read(&me.wrapped_user_data));
+            let UserDataWrapper { actual_user_data, .. } = *wrapper;
+            actual_user_data
+        }
+    }
 }
 
 impl<U> Drop for KIN<U> {

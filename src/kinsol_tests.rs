@@ -589,6 +589,11 @@ fn test_fer_tron_kinsol() -> Result<()> {
     let mset = 0;
     solve_it(&mut kmem, &mut u, &s, glstr, mset)?;
 
+    let recovered = kmem
+        .user_data()
+        .expect("expected FerrarisTronconi user data");
+    assert_eq!(recovered.nnz, NNZ);
+
     // Output:
     //
     // Ferraris and Tronconi test problem
